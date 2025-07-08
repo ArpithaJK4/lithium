@@ -1,48 +1,33 @@
-name: Django CI with Docker Compose
+name: Django CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
 
 jobs:
-  build-test:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker
         uses: docker/setup-buildx-action@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.12
-
-      - name: Create .env file
-        run: |
-          echo "DEBUG=1" > .env
-          echo "SECRET_KEY=temporarykey" >> .env
-          echo "DJANGO_ALLOWED_HOSTS=*" >> .env
-          echo "DATABASE_URL=postgres://postgres@db:5432/postgres" >> .env
-
-      - name: Start Docker Compose services
-        run: docker compose up -d
+      - name: Start services with Docker Compose
+        run: docker compose up -d --build
 
       - name: Wait for DB to be ready
         run: |
-          echo "Waiting for PostgreSQL to start..."
-          sleep 10
-
-      - name: Run Django migrations
-        run: docker compose exec web python /code/manage.py migrate
+          echo "Waiting for PostgreSQL to be ready..."
+          sleep 15
 
       - name: Run Django tests
-        run: docker compose exec web python /code/manage.py test
+        run: docker compose exec web python manage.py test
 
-      - name: Stop Docker Compose
+      - name: Shut down Docker Compose
         if: always()
         run: docker compose down
