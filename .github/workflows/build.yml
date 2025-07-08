@@ -17,15 +17,22 @@ jobs:
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
 
-      - name: Start services with Docker Compose
+      - name: Start Docker Compose in detached mode
         run: docker compose up -d --build
 
-      - name: Wait for DB to be ready
+      - name: Wait for web service to be healthy
         run: |
-          echo "Waiting for PostgreSQL to be ready..."
-          sleep 15
+          echo "Waiting for 'web' container to be healthy..."
+          for i in {1..30}; do
+            status=$(docker inspect --format='{{.State.Health.Status}}' $(docker compose ps -q web) || echo "notfound")
+            echo "Status: $status"
+            if [ "$status" = "healthy" ]; then
+              break
+            fi
+            sleep 3
+          done
 
-      - name: Run Django tests
+      - name: Run Django Tests
         run: docker compose exec web python manage.py test
 
       - name: Shut down Docker Compose
