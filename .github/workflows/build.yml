@@ -1,4 +1,4 @@
-name: Django CI/CD
+name: Django CI
 
 on:
   push:
@@ -7,34 +7,35 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
+
+    services:
+      docker:
+        image: docker:20.10.24-dind
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Compose
+        run: sudo apt-get update && sudo apt-get install -y docker-compose
 
-      - name: Start Docker Compose in detached mode
+      - name: Build and start containers
         run: docker compose up -d --build
 
       - name: Wait for web service to be healthy
         run: |
-          echo "Waiting for 'web' container to be healthy..."
-          for i in {1..30}; do
-            status=$(docker inspect --format='{{.State.Health.Status}}' $(docker compose ps -q web) || echo "notfound")
-            echo "Status: $status"
-            if [ "$status" = "healthy" ]; then
+          for i in {1..10}; do
+            STATUS=$(docker inspect --format='{{json .State.Health.Status}}' $(docker compose ps -q web))
+            echo "Health status: $STATUS"
+            if [ "$STATUS" = "\"healthy\"" ]; then
+              echo "Web container is healthy"
               break
             fi
-            sleep 3
+            echo "Waiting for container to be healthy..."
+            sleep 5
           done
 
-      - name: Run Django Tests
+      - name: Run Django tests
         run: docker compose exec web python manage.py test
-
-      - name: Shut down Docker Compose
-        if: always()
-        run: docker compose down
